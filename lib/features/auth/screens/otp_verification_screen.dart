@@ -3,23 +3,24 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-
-import 'package:nox_ai/core/theme/app_theme.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
-import 'package:nox_ai/core/utils/page_transitions.dart';
-import 'package:nox_ai/features/auth/screens/create_account_screen.dart';
+import 'package:nox_ai/core/theme/app_theme.dart';
+import 'package:nox_ai/providers/app_providers.dart';
 
-class OtpVerificationScreen extends StatefulWidget {
-  final String email;
+class OtpVerificationScreen extends ConsumerStatefulWidget {
+  final String phone;
 
-  const OtpVerificationScreen({super.key, this.email = 'your-email@gmail.com'});
+  const OtpVerificationScreen({super.key, this.phone = ''});
 
   @override
-  State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
+  ConsumerState<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
 }
 
-class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
+class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
+  bool _isLoading = false;
+  String? _error;
   final List<TextEditingController> _otpControllers = List.generate(
     6,
     (_) => TextEditingController(),
@@ -125,9 +126,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
                           const SizedBox(height: 12),
 
-                          // Description with email
+                          // Description with phone
                           Text(
-                            'Enter the 6 digit code sent to ${widget.email}',
+                            'Enter the 6 digit code sent to ${widget.phone.isNotEmpty ? widget.phone : 'your email'}',
                             style: Theme.of(context).textTheme.bodyLarge
                                 ?.copyWith(
                                   color: context.textSecondary,
@@ -182,9 +183,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                                     ),
                                     recognizer: TapGestureRecognizer()
                                       ..onTap = _remainingSeconds == 0
-                                          ? () {
+                                          ? () async {
                                               _startTimer();
-                                              // Handle resend OTP
+                                              try {
+                                                await ref.read(authStateProvider.notifier).sendOtp(widget.phone);
+                                              } catch (_) {}
                                             }
                                           : null,
                                   ),
@@ -201,17 +204,36 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
                           SizedBox(height: height * 0.15),
 
+                          // Error
+                          if (_error != null) ...[
+                            const SizedBox(height: 8),
+                            Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 13)),
+                            const SizedBox(height: 8),
+                          ],
+
                           // Verify button
                           _VerifyButton(
-                            onPressed: () {
-                              // Handle verify
-                              final otp = _otpControllers
-                                  .map((c) => c.text)
-                                  .join();
-                              debugPrint('OTP: $otp');
-                              Navigator.of(context).pushReplacement(
-                                fadeSlideRoute(const CreateAccountScreen()),
-                              );
+                            isLoading: _isLoading,
+                            onPressed: _isLoading ? null : () async {
+                              final otp = _otpControllers.map((c) => c.text).join();
+                              if (otp.length < 6) {
+                                setState(() => _error = 'Enter the full 6-digit OTP');
+                                return;
+                              }
+                              setState(() { _isLoading = true; _error = null; });
+                              try {
+                                debugPrint('[AUTH] Verifying OTP for phone=${widget.phone}, otp=$otp');
+                                await ref.read(authStateProvider.notifier).verifyOtp(widget.phone, otp);
+                                debugPrint('[AUTH] verifyOtp SUCCESS - should redirect to home');
+                              } catch (e) {
+                                debugPrint('[AUTH] verifyOtp ERROR: $e');
+                                if (mounted) {
+                                  setState(() {
+                                    _error = 'Verification failed: $e';
+                                    _isLoading = false;
+                                  });
+                                }
+                              }
                             },
                           ),
 
@@ -382,9 +404,10 @@ class _OtpInputBox extends StatelessWidget {
 }
 
 class _VerifyButton extends StatelessWidget {
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
+  final bool isLoading;
 
-  const _VerifyButton({required this.onPressed});
+  const _VerifyButton({required this.onPressed, this.isLoading = false});
 
   @override
   Widget build(BuildContext context) {
@@ -411,16 +434,23 @@ class _VerifyButton extends StatelessWidget {
         child: InkWell(
           onTap: onPressed,
           borderRadius: BorderRadius.circular(28),
-          child: const Center(
-            child: Text(
-              'Verify',
-              style: TextStyle(
-                color: Color(0xFF1A1208),
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
+          child: Center(
+            child: isLoading
+                ? const SizedBox(
+                    width: 24, height: 24,
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF1A1208), strokeWidth: 2.5,
+                    ),
+                  )
+                : const Text(
+                    'Verify',
+                    style: TextStyle(
+                      color: Color(0xFF1A1208),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
           ),
         ),
       ),

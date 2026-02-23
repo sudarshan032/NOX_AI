@@ -1,73 +1,68 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
+import 'package:nox_ai/core/constants/app_routes.dart';
 import 'package:nox_ai/core/theme/app_theme.dart';
-
 import 'package:nox_ai/core/utils/page_transitions.dart';
-import 'package:nox_ai/features/home/screens/home_screen.dart';
-import 'package:nox_ai/features/tasks/screens/tasks_screen.dart';
-import 'package:nox_ai/features/calendar/screens/calendar_screen.dart';
 import 'package:nox_ai/features/calls/screens/call_detail_screen.dart';
-import 'package:nox_ai/features/profile/screens/profile_settings_screen.dart';
+import 'package:nox_ai/features/calls/screens/make_call_sheet.dart';
+import 'package:nox_ai/providers/app_providers.dart';
 
-class CallLogsScreen extends StatefulWidget {
+class CallLogsScreen extends ConsumerStatefulWidget {
   const CallLogsScreen({super.key});
 
   @override
-  State<CallLogsScreen> createState() => _CallLogsScreenState();
+  ConsumerState<CallLogsScreen> createState() => _CallLogsScreenState();
 }
 
-class _CallLogsScreenState extends State<CallLogsScreen> {
-  int _selectedNavIndex = 0; // Logs tab selected
-  int _selectedFilter =
-      0; // 0: All, 1: Connected, 2: No Answer, 3: Failed, 4: Inbound
+class _CallLogsScreenState extends ConsumerState<CallLogsScreen> {
+  int _selectedNavIndex = 0;
+  int _selectedFilter = 0; // 0: All, 1: Connected, 2: No Answer, 3: Failed, 4: Inbound
 
   final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _callLogs = [];
+  bool _isLoading = true;
 
-  // TODO: Fetch call logs from backend API
-  // This is sample/placeholder data for UI template
-  // Replace with actual API call: await CallLogsService.fetchLogs()
-  final List<Map<String, dynamic>> _callLogs = [
-    {
-      'number': '+91 76750 53840',
-      'date': 'FEB 13, 2026',
-      'time': '10:45 AM',
-      'status': 'connected',
-      'duration': '12m 4s',
-      'type': 'outgoing',
-    },
-    {
-      'number': '+91 76750 53840',
-      'date': 'FEB 10, 2026',
-      'time': '09:12 AM',
-      'status': 'no_answer',
-      'duration': null,
-      'type': 'outgoing',
-    },
-    {
-      'number': '+1 415 555 0199',
-      'date': 'FEB 10, 2026',
-      'time': '04:30 PM',
-      'status': 'connected',
-      'duration': '4m 22s',
-      'type': 'incoming',
-    },
-    {
-      'number': '+91 76750 53840',
-      'date': 'FEB 09, 2026',
-      'time': '02:15 PM',
-      'status': 'connected',
-      'duration': '1h 05m',
-      'type': 'outgoing',
-    },
-    {
-      'number': '+91 76750 53840',
-      'date': 'FEB 08, 2026',
-      'time': '11:20 AM',
-      'status': 'failed',
-      'duration': null,
-      'type': 'outgoing',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadCalls();
+  }
+
+  Future<void> _loadCalls() async {
+    try {
+      final calls = await ref.read(callsRepositoryProvider).listCalls();
+      if (!mounted) return;
+      setState(() {
+        _callLogs = calls.map((c) {
+          final dt = c.startedAt ?? c.createdAt;
+          return {
+            'id': c.id,
+            'number': c.phoneNumber ?? '--',
+            'date': DateFormat('MMM dd, yyyy').format(dt).toUpperCase(),
+            'time': DateFormat('hh:mm a').format(dt),
+            'status': _mapStatus(c.status),
+            'duration': c.durationDisplay == '--' ? null : c.durationDisplay,
+            'type': c.direction == 'inbound' ? 'incoming' : 'outgoing',
+          };
+        }).toList();
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _mapStatus(String status) {
+    switch (status) {
+      case 'completed': return 'connected';
+      case 'no_answer': return 'no_answer';
+      case 'failed': return 'failed';
+      default: return status;
+    }
+  }
 
   List<Map<String, dynamic>> get _filteredLogs {
     final searchQuery = _searchController.text.toLowerCase();
@@ -95,6 +90,21 @@ class _CallLogsScreenState extends State<CallLogsScreen> {
     super.dispose();
   }
 
+  void _showMakeCallSheet() async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: const MakeCallSheet(),
+      ),
+    );
+    if (result == true) {
+      _loadCalls(); // Refresh list after call initiated
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -104,14 +114,48 @@ class _CallLogsScreenState extends State<CallLogsScreen> {
           children: [
             const SizedBox(height: 20),
 
-            // Title
-            Text(
-              'CALL LOGS',
-              style: TextStyle(
-                color: context.textPrimary,
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 4,
+            // Title row with Make Call button
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'CALL LOGS',
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 4,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _showMakeCallSheet,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: context.gold,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.call, color: context.bg, size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            'CALL',
+                            style: TextStyle(
+                              color: context.bg,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
 
@@ -127,29 +171,120 @@ class _CallLogsScreenState extends State<CallLogsScreen> {
 
             const SizedBox(height: 8),
 
-            // Call logs list
+            // Call logs list or empty state
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _filteredLogs.length,
-                itemBuilder: (context, index) {
-                  return _CallLogItem(
-                    data: _filteredLogs[index],
-                    onTap: () {
-                      Navigator.of(context).push(
-                        fadeSlideRoute(
-                          CallDetailScreen(callData: _filteredLogs[index]),
+              child: _isLoading
+                  ? Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(context.gold),
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : _filteredLogs.isEmpty
+                      ? _buildEmptyState()
+                      : RefreshIndicator(
+                          onRefresh: _loadCalls,
+                          color: context.gold,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            itemCount: _filteredLogs.length,
+                            itemBuilder: (context, index) {
+                              return _CallLogItem(
+                                data: _filteredLogs[index],
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    fadeSlideRoute(
+                                      CallDetailScreen(callData: _filteredLogs[index]),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
                         ),
-                      );
-                    },
-                  );
-                },
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showMakeCallSheet,
+        backgroundColor: context.gold,
+        child: Icon(Icons.call, color: context.bg),
+      ),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: context.cardBg,
+                border: Border.all(color: context.cardBorder, width: 1),
+              ),
+              child: Icon(
+                Icons.phone_outlined,
+                color: context.textSecondary.withOpacity(0.5),
+                size: 36,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'No calls yet',
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Start your first AI call by tapping\nthe button below',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: context.textSecondary.withOpacity(0.7),
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: _showMakeCallSheet,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                decoration: BoxDecoration(
+                  color: context.gold,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.call, color: context.bg, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'MAKE A CALL',
+                      style: TextStyle(
+                        color: context.bg,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
@@ -247,19 +382,11 @@ class _CallLogsScreenState extends State<CallLogsScreen> {
                 icon: Icons.calendar_today_outlined,
                 label: 'Calendar',
                 isSelected: _selectedNavIndex == 1,
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const CalendarScreen()));
-                },
+                onTap: () => context.go(AppRoutes.calendar),
               ),
               // Center mic button
               GestureDetector(
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const HomeScreen()));
-                },
+                onTap: () => context.go(AppRoutes.home),
                 child: Container(
                   width: 64,
                   height: 64,
@@ -279,21 +406,13 @@ class _CallLogsScreenState extends State<CallLogsScreen> {
                 icon: Icons.check_circle_outline,
                 label: 'Tasks',
                 isSelected: _selectedNavIndex == 3,
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const TasksScreen()));
-                },
+                onTap: () => context.go(AppRoutes.tasks),
               ),
               _NavItem(
                 icon: Icons.person_outline,
                 label: 'Profile',
                 isSelected: _selectedNavIndex == 4,
-                onTap: () {
-                  Navigator.of(context).pushReplacement(
-                    bottomNavRoute(const ProfileSettingsScreen()),
-                  );
-                },
+                onTap: () => context.go(AppRoutes.profileSettings),
               ),
             ],
           ),

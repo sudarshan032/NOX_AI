@@ -1,27 +1,26 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:nox_ai/core/constants/app_routes.dart';
 import 'package:nox_ai/core/theme/app_theme.dart';
-
 import 'package:nox_ai/core/utils/page_transitions.dart';
-import 'package:nox_ai/features/tasks/screens/tasks_screen.dart';
-import 'package:nox_ai/features/calendar/screens/calendar_screen.dart';
-import 'package:nox_ai/features/calls/screens/call_logs_screen.dart';
-import 'package:nox_ai/features/profile/screens/profile_settings_screen.dart';
 import 'package:nox_ai/features/notifications/screens/notifications_screen.dart';
+import 'package:nox_ai/providers/app_providers.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
+class _HomeScreenState extends ConsumerState<HomeScreen>
     with SingleTickerProviderStateMixin {
   bool _agentActive = true;
-  int _selectedNavIndex = 2; // Center mic button
+  int _selectedNavIndex = 2;
 
   late AnimationController _orbController;
   final TextEditingController _messageController = TextEditingController();
@@ -33,6 +32,23 @@ class _HomeScreenState extends State<HomeScreen>
       vsync: this,
       duration: const Duration(milliseconds: 3000),
     )..repeat();
+    _loadAgentState();
+  }
+
+  Future<void> _loadAgentState() async {
+    try {
+      final user = await ref.read(userRepositoryProvider).getMe();
+      if (mounted) setState(() => _agentActive = user.agentEnabled);
+    } catch (_) {}
+  }
+
+  Future<void> _toggleAgent(bool value) async {
+    setState(() => _agentActive = value);
+    try {
+      await ref.read(userRepositoryProvider).toggleAgent(value);
+    } catch (_) {
+      if (mounted) setState(() => _agentActive = !value);
+    }
   }
 
   @override
@@ -126,12 +142,7 @@ class _HomeScreenState extends State<HomeScreen>
               top: 20,
               left: 16,
               child: GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    fadeSlideRoute(const NotificationsScreen()),
-                  );
-                },
+                onTap: () => context.go(AppRoutes.notifications),
                 child: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
@@ -158,9 +169,7 @@ class _HomeScreenState extends State<HomeScreen>
     return Center(
       child: GestureDetector(
         onTap: () {
-          setState(() {
-            _agentActive = !_agentActive;
-          });
+          _toggleAgent(!_agentActive);
         },
         child: SizedBox(
           width: 280,
@@ -206,11 +215,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             const SizedBox(width: 12),
             GestureDetector(
-              onTap: () {
-                setState(() {
-                  _agentActive = !_agentActive;
-                });
-              },
+              onTap: () => _toggleAgent(!_agentActive),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 width: 48,
@@ -399,21 +404,13 @@ class _HomeScreenState extends State<HomeScreen>
                 icon: Icons.phone_outlined,
                 label: 'Call Logs',
                 isSelected: _selectedNavIndex == 0,
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const CallLogsScreen()));
-                },
+                onTap: () => context.go(AppRoutes.callLogs),
               ),
               _NavItem(
                 icon: Icons.calendar_today_outlined,
                 label: 'Calendar',
                 isSelected: _selectedNavIndex == 1,
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const CalendarScreen()));
-                },
+                onTap: () => context.go(AppRoutes.calendar),
               ),
               // Center mic button
               GestureDetector(
@@ -453,21 +450,13 @@ class _HomeScreenState extends State<HomeScreen>
                 icon: Icons.check_circle_outline,
                 label: 'Tasks',
                 isSelected: _selectedNavIndex == 3,
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const TasksScreen()));
-                },
+                onTap: () => context.go(AppRoutes.tasks),
               ),
               _NavItem(
                 icon: Icons.person_outline,
                 label: 'Profile',
                 isSelected: _selectedNavIndex == 4,
-                onTap: () {
-                  Navigator.of(context).pushReplacement(
-                    bottomNavRoute(const ProfileSettingsScreen()),
-                  );
-                },
+                onTap: () => context.go(AppRoutes.profileSettings),
               ),
             ],
           ),

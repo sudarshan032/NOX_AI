@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:nox_ai/core/theme/app_theme.dart';
-
 import 'package:nox_ai/core/utils/page_transitions.dart';
+import 'package:nox_ai/data/models/memory_model.dart';
+import 'package:nox_ai/providers/app_providers.dart';
 
-class MemoriesScreen extends StatefulWidget {
+class MemoriesScreen extends ConsumerStatefulWidget {
   const MemoriesScreen({super.key});
 
   @override
-  State<MemoriesScreen> createState() => _MemoriesScreenState();
+  ConsumerState<MemoriesScreen> createState() => _MemoriesScreenState();
 }
 
-class _MemoriesScreenState extends State<MemoriesScreen> {
+class _MemoriesScreenState extends ConsumerState<MemoriesScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  // Tag colors
   static const _tagColors = {
     'Strategy': Color(0xFFE57373),
     'Docs': Color(0xFF64B5F6),
@@ -27,99 +28,58 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
     'Legal': Color(0xFFFFB74D),
   };
 
-  // TODO: Fetch memories from backend API
-  // Sample data for UI template
-  final List<Map<String, dynamic>> _memories = [
-    {
-      'id': '1',
-      'title': 'Q3 Strategy Call',
-      'description':
-          'Discussion about revenue targets and hiring plans for the upcoming quarter. Key focus on th...',
-      'detail':
-          'The client mentioned they are looking to renew their contract in Q3 but wants to discuss pricing tiers before committing. Specifically interested in the enterprise volume discount.',
-      'tags': ['Strategy'],
-      'type': 'call',
-      'timestamp': '2h ago',
-      'isPinned': true,
-      'linkedSources': [
-        {
-          'name': 'Q2_Meeting_Transcript.pdf',
-          'uploadedAt': '2h ago',
-          'size': '1.2 MB',
-        },
-      ],
-    },
-    {
-      'id': '2',
-      'title': 'Project Spec V2',
-      'description':
-          'Uploaded PDF containing the new API requirements and endpoint definitions. Includes...',
-      'detail':
-          'Updated project specifications including new REST API endpoints, authentication flow changes, and database schema modifications for the v2 release.',
-      'tags': ['Docs', 'API'],
-      'type': 'document',
-      'timestamp': '5h ago',
-      'isPinned': false,
-      'linkedSources': [],
-    },
-    {
-      'id': '3',
-      'title': 'Client Intro: TechCorp',
-      'description':
-          'Introductory call with the marketing team. They are interested in the premium tier but requeste...',
-      'detail':
-          'Initial discovery call with TechCorp marketing team. They have a team of 50+ and are evaluating enterprise solutions. Decision maker is Sarah Chen, VP of Marketing.',
-      'tags': ['Sales'],
-      'type': 'call',
-      'timestamp': '1d ago',
-      'isPinned': false,
-      'linkedSources': [],
-    },
-    {
-      'id': '4',
-      'title': 'Market Trends Report',
-      'description':
-          'Analysis of competitor features launched this week. Main takeaway is the new AI integration i...',
-      'detail':
-          'Competitive analysis showing 3 major competitors launched AI features this quarter. Key differentiators: real-time transcription, sentiment analysis, and automated follow-ups.',
-      'tags': ['Market'],
-      'type': 'chart',
-      'timestamp': '2d ago',
-      'isPinned': false,
-      'linkedSources': [],
-    },
-    {
-      'id': '5',
-      'title': 'Customer Renewal Preference',
-      'description':
-          'The client mentioned they are looking to renew their contract in Q3 but wants to discuss...',
-      'detail':
-          'The client mentioned they are looking to renew their contract in Q3 but wants to discuss pricing tiers before committing. Specifically interested in the enterprise volume discount.',
-      'tags': ['Sales', 'High Priority'],
-      'type': 'call',
-      'timestamp': '3d ago',
-      'isPinned': false,
-      'linkedSources': [
-        {
-          'name': 'Q2_Meeting_Transcript.pdf',
-          'uploadedAt': '2h ago',
-          'size': '1.2 MB',
-        },
-      ],
-    },
-  ];
+  List<MemoryModel> _memories = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMemories();
+  }
+
+  Future<void> _loadMemories() async {
+    try {
+      final mems = await ref.read(memoryRepositoryProvider).listMemories();
+      if (mounted) setState(() { _memories = mems; _isLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   List<Map<String, dynamic>> get _filteredMemories {
-    if (_searchQuery.isEmpty) return _memories;
+    final mapped = _memories.map((m) => {
+      'id': m.id,
+      'title': m.key,
+      'description': m.value,
+      'detail': m.value,
+      'tags': [m.category],
+      'type': m.source,
+      'timestamp': _timeAgo(m.createdAt),
+      'isPinned': false,
+      'linkedSources': <Map<String, dynamic>>[],
+    }).toList();
+
+    if (_searchQuery.isEmpty) return mapped;
     final query = _searchQuery.toLowerCase();
-    return _memories.where((m) {
+    return mapped.where((m) {
       final title = (m['title'] as String).toLowerCase();
       final desc = (m['description'] as String).toLowerCase();
-      final tags = (m['tags'] as List<String>).join(' ').toLowerCase();
-      return title.contains(query) ||
-          desc.contains(query) ||
-          tags.contains(query);
+      return title.contains(query) || desc.contains(query);
     }).toList();
+  }
+
+  String _timeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inDays > 0) return '${diff.inDays}d ago';
+    if (diff.inHours > 0) return '${diff.inHours}h ago';
+    return '${diff.inMinutes}m ago';
+  }
+
+  Future<void> _deleteMemory(String id) async {
+    try {
+      await ref.read(memoryRepositoryProvider).deleteMemory(id);
+      await _loadMemories();
+    } catch (_) {}
   }
 
   @override

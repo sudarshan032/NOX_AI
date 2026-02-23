@@ -2,28 +2,62 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:nox_ai/core/constants/app_routes.dart';
 import 'package:nox_ai/core/theme/app_theme.dart';
+import 'package:nox_ai/providers/app_providers.dart';
 
-import 'package:nox_ai/core/utils/page_transitions.dart';
-import 'package:nox_ai/features/home/screens/home_screen.dart';
-
-class CreateAccountScreen extends StatefulWidget {
+class CreateAccountScreen extends ConsumerStatefulWidget {
   const CreateAccountScreen({super.key});
 
   @override
-  State<CreateAccountScreen> createState() => _CreateAccountScreenState();
+  ConsumerState<CreateAccountScreen> createState() => _CreateAccountScreenState();
 }
 
-class _CreateAccountScreenState extends State<CreateAccountScreen> {
+class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _mobileNumberController = TextEditingController();
+  bool _isLoading = false;
+  String? _error;
 
   @override
   void dispose() {
     _usernameController.dispose();
     _mobileNumberController.dispose();
     super.dispose();
+  }
+
+  Future<void> _onInitialise() async {
+    final phone = _mobileNumberController.text.trim();
+    if (phone.isEmpty) {
+      setState(() => _error = 'Please enter your email');
+      return;
+    }
+    setState(() { _isLoading = true; _error = null; });
+    try {
+      debugPrint('[AUTH] Sending OTP to: $phone');
+      final otp = await ref.read(authStateProvider.notifier).sendOtp(phone);
+      debugPrint('[AUTH] sendOtp returned otp=$otp');
+      if (mounted) {
+        if (otp != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('DEBUG OTP: $otp'),
+              duration: const Duration(seconds: 30),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        context.go(AppRoutes.otpVerification, extra: phone);
+      }
+    } catch (e) {
+      debugPrint('[AUTH] sendOtp ERROR: $e');
+      if (mounted) setState(() => _error = e.toString().replaceFirst('ApiException', '').trim());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -71,7 +105,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
                           // Description
                           Text(
-                            'Set a username and mobile number to continue.',
+                            'Set a username and email to continue.',
                             style: Theme.of(context).textTheme.bodyLarge
                                 ?.copyWith(
                                   color: context.textSecondary,
@@ -93,22 +127,28 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
                           const SizedBox(height: 16),
 
-                          // Mobile Number field
+                          // Email field
                           _InputField(
                             controller: _mobileNumberController,
-                            hintText: 'Mobile Number',
-                            prefixIcon: Icons.phone_outlined,
+                            hintText: 'Email',
+                            prefixIcon: Icons.email_outlined,
                           ),
 
                           const SizedBox(height: 32),
 
+                          // Error message
+                          if (_error != null) ...[
+                            Text(
+                              _error!,
+                              style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+
                           // Create Account button
                           _CreateAccountButton(
-                            onPressed: () {
-                              Navigator.of(context).pushReplacement(
-                                fadeSlideRoute(const HomeScreen()),
-                              );
-                            },
+                            isLoading: _isLoading,
+                            onPressed: _isLoading ? null : _onInitialise,
                           ),
 
                           const SizedBox(height: 24),
@@ -263,9 +303,10 @@ class _InputField extends StatelessWidget {
 }
 
 class _CreateAccountButton extends StatelessWidget {
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
+  final bool isLoading;
 
-  const _CreateAccountButton({required this.onPressed});
+  const _CreateAccountButton({required this.onPressed, this.isLoading = false});
 
   @override
   Widget build(BuildContext context) {
@@ -292,16 +333,23 @@ class _CreateAccountButton extends StatelessWidget {
         child: InkWell(
           onTap: onPressed,
           borderRadius: BorderRadius.circular(28),
-          child: const Center(
-            child: Text(
-              'Initialise Agent',
-              style: TextStyle(
-                color: Color(0xFF1A1208),
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
+          child: Center(
+            child: isLoading
+                ? const SizedBox(
+                    width: 24, height: 24,
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF1A1208), strokeWidth: 2.5,
+                    ),
+                  )
+                : const Text(
+                    'Initialise Agent',
+                    style: TextStyle(
+                      color: Color(0xFF1A1208),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
           ),
         ),
       ),

@@ -1,86 +1,63 @@
-/// Call Model Template
-/// 
-/// This file contains models for call logs and call details.
-/// Uncomment when implementing call history feature.
+class CallModel {
+  final String id;
+  final String? taskId;
+  final String direction; // inbound | outbound
+  final String status;
+  final String? phoneNumber;
+  final int? durationSeconds;
+  final String? recordingUrl;
+  final DateTime? startedAt;
+  final DateTime createdAt;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PRODUCTION: Call Models (uncomment when ready)
-// ─────────────────────────────────────────────────────────────────────────────
+  CallModel({
+    required this.id,
+    this.taskId,
+    required this.direction,
+    required this.status,
+    this.phoneNumber,
+    this.durationSeconds,
+    this.recordingUrl,
+    this.startedAt,
+    required this.createdAt,
+  });
 
-// import 'package:equatable/equatable.dart';
-// import 'package:json_annotation/json_annotation.dart';
-// 
-// part 'call_model.g.dart';
-// 
-// enum CallType { incoming, outgoing, missed }
-// 
-// enum CallStatus { completed, missed, declined, busy }
-// 
-// @JsonSerializable()
-// class CallModel extends Equatable {
-//   final String id;
-//   final String contactName;
-//   final String? contactPhone;
-//   final String? contactAvatarUrl;
-//   final CallType type;
-//   final CallStatus status;
-//   final Duration duration;
-//   final DateTime timestamp;
-//   final String? summary;
-//   final List<TranscriptEntry>? transcript;
-//   final List<String>? actionItems;
-//   final bool isFlagged;
-// 
-//   const CallModel({
-//     required this.id,
-//     required this.contactName,
-//     this.contactPhone,
-//     this.contactAvatarUrl,
-//     required this.type,
-//     required this.status,
-//     required this.duration,
-//     required this.timestamp,
-//     this.summary,
-//     this.transcript,
-//     this.actionItems,
-//     this.isFlagged = false,
-//   });
-// 
-//   factory CallModel.fromJson(Map<String, dynamic> json) =>
-//       _$CallModelFromJson(json);
-// 
-//   Map<String, dynamic> toJson() => _$CallModelToJson(this);
-// 
-//   @override
-//   List<Object?> get props => [
-//         id,
-//         contactName,
-//         contactPhone,
-//         type,
-//         status,
-//         duration,
-//         timestamp,
-//         isFlagged,
-//       ];
-// }
-// 
-// @JsonSerializable()
-// class TranscriptEntry extends Equatable {
-//   final String speaker; // 'user', 'contact', 'agent'
-//   final String text;
-//   final DateTime timestamp;
-// 
-//   const TranscriptEntry({
-//     required this.speaker,
-//     required this.text,
-//     required this.timestamp,
-//   });
-// 
-//   factory TranscriptEntry.fromJson(Map<String, dynamic> json) =>
-//       _$TranscriptEntryFromJson(json);
-// 
-//   Map<String, dynamic> toJson() => _$TranscriptEntryToJson(this);
-// 
-//   @override
-//   List<Object?> get props => [speaker, text, timestamp];
-// }
+  factory CallModel.fromJson(Map<String, dynamic> json) => CallModel(
+        id: json['id'] as String,
+        taskId: json['task_id'] as String?,
+        direction: json['direction'] as String? ?? 'outbound',
+        status: json['status'] as String? ?? 'completed',
+        phoneNumber: json['phone_number'] as String?,
+        durationSeconds: json['duration_seconds'] as int?,
+        recordingUrl: json['recording_url'] as String?,
+        startedAt: json['started_at'] != null ? DateTime.parse(json['started_at'] as String) : null,
+        createdAt: DateTime.parse(json['created_at'] as String),
+      );
+
+  String get durationDisplay {
+    if (durationSeconds == null) return '--';
+    final m = durationSeconds! ~/ 60;
+    final s = durationSeconds! % 60;
+    return '${m}m ${s}s';
+  }
+}
+
+class TranscriptModel {
+  final String id;
+  final String callId;
+  final String? fullText;
+  final String? summary;
+
+  TranscriptModel({
+    required this.id,
+    required this.callId,
+    this.fullText,
+    this.summary,
+  });
+
+  factory TranscriptModel.fromJson(Map<String, dynamic> json) => TranscriptModel(
+        id: json['id'] as String,
+        callId: json['call_id'] as String,
+        fullText: json['full_text'] as String?,
+        summary: json['summary'] as String?,
+      );
+}

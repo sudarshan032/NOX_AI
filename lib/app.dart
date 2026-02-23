@@ -1,39 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:nox_ai/core/theme/app_theme.dart';
-import 'package:nox_ai/core/theme/theme_provider.dart';
-import 'package:nox_ai/features/splash/screens/splash_screen.dart';
+import 'package:nox_ai/routes/app_router.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PRODUCTION IMPORTS (uncomment when ready)
-// ─────────────────────────────────────────────────────────────────────────────
-// import 'package:nox_ai/routes/app_router.dart';
-
-/// Root application widget
-///
-/// Configures MaterialApp with theme support and initial routing.
-/// In production, replace Navigator 1.0 with GoRouter for declarative routing.
-class App extends StatelessWidget {
+class App extends ConsumerWidget {
   const App({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: ThemeProvider(),
-      builder: (context, child) {
-        return MaterialApp(
-          title: 'Demo App',
-          debugShowCheckedModeBanner: false,
-          theme: lightTheme,
-          darkTheme: darkTheme,
-          themeMode: ThemeProvider().themeMode,
-          home: const SplashScreen(),
-          // ─────────────────────────────────────────────────────────────────
-          // PRODUCTION: Use GoRouter for navigation (uncomment when ready)
-          // ─────────────────────────────────────────────────────────────────
-          // routerConfig: appRouter,
-        );
-      },
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(routerProvider);
+    return MaterialApp.router(
+      title: 'NOX AI',
+      debugShowCheckedModeBanner: false,
+      theme: lightTheme,
+      darkTheme: darkTheme,
+      themeMode: ThemeMode.dark,
+      routerConfig: router,
     );
   }
 }

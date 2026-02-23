@@ -1,46 +1,82 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import 'package:nox_ai/core/constants/app_routes.dart';
 import 'package:nox_ai/core/theme/app_theme.dart';
 import 'package:nox_ai/core/theme/theme_provider.dart';
-import 'package:nox_ai/core/utils/page_transitions.dart';
-import 'package:nox_ai/features/home/screens/home_screen.dart';
-import 'package:nox_ai/features/tasks/screens/tasks_screen.dart';
-import 'package:nox_ai/features/calendar/screens/calendar_screen.dart';
-import 'package:nox_ai/features/calls/screens/call_logs_screen.dart';
-import 'package:nox_ai/features/memories/screens/memories_screen.dart';
+import 'package:nox_ai/providers/app_providers.dart';
 
-class ProfileSettingsScreen extends StatefulWidget {
+class ProfileSettingsScreen extends ConsumerStatefulWidget {
   const ProfileSettingsScreen({super.key});
 
   @override
-  State<ProfileSettingsScreen> createState() => _ProfileSettingsScreenState();
+  ConsumerState<ProfileSettingsScreen> createState() => _ProfileSettingsScreenState();
 }
 
-class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
-  int _selectedNavIndex = 4; // Profile tab selected
+class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
+  int _selectedNavIndex = 4;
 
-  // Settings state
   String _selectedPersonality = 'Executive';
   bool _notificationsEnabled = true;
   bool _callNotifications = true;
   bool _taskReminders = true;
   bool _calendarAlerts = true;
   String _selectedLanguage = 'English (US)';
+  String _userName = '--';
+  String _userPhone = '--';
 
-  // App integrations state
+  bool _googleCalendarConnected = false;
+  bool _gmailConnected = false;
+  bool _whatsappConnected = false;
+
   final Map<String, bool> _appIntegrations = {
-    'Google Calendar': true,
-    'Microsoft Outlook': true,
-    'Slack': true,
+    'Microsoft Outlook': false,
+    'Slack': false,
     'Zoom': false,
     'Salesforce': false,
   };
 
-  // Privacy settings state
   bool _voiceRecording = true;
   bool _callTranscription = true;
   bool _dataAnalytics = true;
   bool _personalizedSuggestions = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    try {
+      final user = await ref.read(userRepositoryProvider).getMe();
+      if (mounted) {
+        setState(() {
+          _userName = user.name ?? '--';
+          _userPhone = user.phoneNumber;
+          _googleCalendarConnected = user.calendarConnected;
+          _gmailConnected = user.gmailConnected;
+          _whatsappConnected = user.whatsappOptIn;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _connectGoogle() async {
+    try {
+      final url = await ref.read(calendarRepositoryProvider).getGoogleAuthUrl();
+      if (await canLaunchUrl(Uri.parse(url))) {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _signOut() async {
+    await ref.read(authStateProvider.notifier).signOut();
+    if (mounted) context.go(AppRoutes.createAccount);
+  }
 
   String _getAppearanceName() {
     switch (ThemeProvider().themeMode) {
@@ -98,12 +134,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                     icon: Icons.public_outlined,
                     label: 'Memory Vault',
                     value: '142 Facts',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        fadeSlideRoute(const MemoriesScreen()),
-                      );
-                    },
+                    onTap: () => context.go(AppRoutes.memories),
                   ),
                 ]),
 
@@ -129,7 +160,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                     icon: Icons.phone_android_outlined,
                     label: 'App Integrations',
                     value:
-                        '${_appIntegrations.values.where((v) => v).length} Active',
+                        '${_appIntegrations.values.where((v) => v).length + (_googleCalendarConnected ? 1 : 0) + (_gmailConnected ? 1 : 0) + (_whatsappConnected ? 1 : 0)} Active',
                     onTap: () => _showAppIntegrationsSheet(),
                   ),
                 ]),
@@ -228,7 +259,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'HARRISON WELLS',
+                _userName.toUpperCase(),
                 style: TextStyle(
                   color: context.textPrimary,
                   fontSize: 16,
@@ -593,6 +624,18 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     );
   }
 
+  Future<void> _disconnectGoogle() async {
+    try {
+      await ref.read(calendarRepositoryProvider).disconnectGoogle();
+      if (mounted) {
+        setState(() {
+          _googleCalendarConnected = false;
+          _gmailConnected = false;
+        });
+      }
+    } catch (_) {}
+  }
+
   void _showAppIntegrationsSheet() {
     showModalBottomSheet(
       context: context,
@@ -602,18 +645,141 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         builder: (context, setSheetState) => _buildBottomSheetContainer(
           title: 'App Integrations',
           child: Column(
-            children: _appIntegrations.entries.map((entry) {
-              return _buildToggleRow(
-                entry.key,
-                entry.value ? 'Connected' : 'Not connected',
-                entry.value,
-                (val) {
-                  setSheetState(() => _appIntegrations[entry.key] = val);
+            children: [
+              // Google Calendar
+              _buildIntegrationRow(
+                icon: Icons.calendar_today_outlined,
+                title: 'Google Calendar',
+                subtitle: _googleCalendarConnected ? 'Connected' : 'Not connected',
+                isConnected: _googleCalendarConnected,
+                onTap: () {
+                  if (_googleCalendarConnected) {
+                    _disconnectGoogle();
+                    setSheetState(() {});
+                  } else {
+                    _connectGoogle();
+                    Navigator.pop(context);
+                  }
+                },
+              ),
+
+              // Gmail
+              _buildIntegrationRow(
+                icon: Icons.mail_outline,
+                title: 'Gmail',
+                subtitle: _gmailConnected ? 'Connected' : 'Not connected',
+                isConnected: _gmailConnected,
+                onTap: () {
+                  if (!_gmailConnected) {
+                    _connectGoogle(); // Same OAuth flow covers both
+                    Navigator.pop(context);
+                  }
+                },
+              ),
+
+              // WhatsApp
+              _buildIntegrationRow(
+                icon: Icons.chat_outlined,
+                title: 'WhatsApp',
+                subtitle: _whatsappConnected ? 'Connected' : 'Not connected',
+                isConnected: _whatsappConnected,
+                onTap: () {
+                  setSheetState(() => _whatsappConnected = !_whatsappConnected);
                   setState(() {});
                 },
-              );
-            }).toList(),
+              ),
+
+              const SizedBox(height: 8),
+              Divider(color: context.cardBorder),
+              const SizedBox(height: 8),
+
+              // Other integrations
+              ..._appIntegrations.entries.map((entry) {
+                return _buildToggleRow(
+                  entry.key,
+                  entry.value ? 'Connected' : 'Not connected',
+                  entry.value,
+                  (val) {
+                    setSheetState(() => _appIntegrations[entry.key] = val);
+                    setState(() {});
+                  },
+                );
+              }),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIntegrationRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool isConnected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isConnected ? context.gold.withOpacity(0.08) : context.cardBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isConnected ? context.gold.withOpacity(0.4) : context.cardBorder,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: isConnected ? context.gold : context.textSecondary, size: 22),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: isConnected ? context.gold : context.textSecondary.withOpacity(0.7),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isConnected ? context.gold.withOpacity(0.15) : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isConnected ? context.gold : context.cardBorder,
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                isConnected ? 'DISCONNECT' : 'CONNECT',
+                style: TextStyle(
+                  color: isConnected ? context.gold : context.textSecondary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -926,7 +1092,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              // TODO: Implement actual sign out logic
+              _signOut();
             },
             child: Text(
               'Sign Out',
@@ -1084,29 +1250,17 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 icon: Icons.phone_outlined,
                 label: 'Call Logs',
                 isSelected: _selectedNavIndex == 0,
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const CallLogsScreen()));
-                },
+                onTap: () => context.go(AppRoutes.callLogs),
               ),
               _NavItem(
                 icon: Icons.calendar_today_outlined,
                 label: 'Calendar',
                 isSelected: _selectedNavIndex == 1,
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const CalendarScreen()));
-                },
+                onTap: () => context.go(AppRoutes.calendar),
               ),
               // Center mic button
               GestureDetector(
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const HomeScreen()));
-                },
+                onTap: () => context.go(AppRoutes.home),
                 child: Container(
                   width: 64,
                   height: 64,
@@ -1126,11 +1280,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 icon: Icons.check_circle_outline,
                 label: 'Tasks',
                 isSelected: _selectedNavIndex == 3,
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const TasksScreen()));
-                },
+                onTap: () => context.go(AppRoutes.tasks),
               ),
               _NavItem(
                 icon: Icons.person_outline,

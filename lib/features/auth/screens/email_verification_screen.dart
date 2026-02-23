@@ -94,7 +94,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                               Navigator.of(context).pushReplacement(
                                 fadeSlideRoute(
                                   OtpVerificationScreen(
-                                    email: _emailController.text.isNotEmpty
+                                    phone: _emailController.text.isNotEmpty
                                         ? _emailController.text
                                         : 'your-email@gmail.com',
                                   ),

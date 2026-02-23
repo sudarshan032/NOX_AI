@@ -1,12 +1,4 @@
 /// Application-wide constants
-///
-/// This file contains general constant values used throughout the app.
-/// For specific constants, see:
-/// - [AppRoutes] for navigation routes
-/// - [AppStrings] for UI text
-/// - [AppAssets] for asset paths
-/// - [AppColors] for color definitions (in theme folder)
-
 class AppConstants {
   AppConstants._();
 
@@ -28,27 +20,35 @@ class AppConstants {
   static const double radiusXL = 24.0;
 
   // ─────────────────────────────────────────────────────────────────────────
-  // PRODUCTION: API Configuration (uncomment when ready)
+  // API Configuration
+  // For local dev on Android emulator use: http://10.0.2.2:8010
+  // For real device on same Wi-Fi use: http://<your-machine-ip>:8010
+  // For production use: https://api.yourdomain.com
   // ─────────────────────────────────────────────────────────────────────────
-  // static const String baseUrl = 'https://api.yourapp.com';
-  // static const String apiVersion = 'v1';
-  // static const Duration apiTimeout = Duration(seconds: 30);
-  //
-  // // API Endpoints
-  // static const String authEndpoint = '/auth';
-  // static const String usersEndpoint = '/users';
-  // static const String callsEndpoint = '/calls';
-  // static const String tasksEndpoint = '/tasks';
-  // static const String memoriesEndpoint = '/memories';
-  // static const String calendarEndpoint = '/calendar';
-  // static const String notificationsEndpoint = '/notifications';
+  static const String baseUrl = String.fromEnvironment(
+    'BASE_URL',
+    defaultValue: 'http://192.168.29.71:8010',
+  );
+  static const String apiVersion = 'api/v1';
+  static const Duration apiTimeout = Duration(seconds: 30);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // PRODUCTION: Storage Keys (uncomment when ready)
-  // ─────────────────────────────────────────────────────────────────────────
-  // static const String authTokenKey = 'auth_token';
-  // static const String refreshTokenKey = 'refresh_token';
-  // static const String userDataKey = 'user_data';
-  // static const String themePreferenceKey = 'theme_preference';
-  // static const String onboardingCompleteKey = 'onboarding_complete';
+  // API Endpoints
+  static const String authEndpoint = '/auth';
+  static const String usersEndpoint = '/users';
+  static const String callsEndpoint = '/calls';
+  static const String tasksEndpoint = '/tasks';
+  static const String memoriesEndpoint = '/memory';
+  static const String calendarEndpoint = '/calendar';
+  static const String approvalsEndpoint = '/approvals';
+  static const String dailyBriefEndpoint = '/daily-brief';
+  static const String preferencesEndpoint = '/preferences';
+  static const String googleEndpoint = '/google';
+
+  // Storage Keys
+  static const String accessTokenKey = 'access_token';
+  static const String refreshTokenKey = 'refresh_token';
+  static const String userIdKey = 'user_id';
+  static const String phoneKey = 'phone_number';
+  static const String onboardingCompleteKey = 'onboarding_complete';
+  static const String themePreferenceKey = 'theme_preference';
 }

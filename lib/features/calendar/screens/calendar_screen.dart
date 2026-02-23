@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:nox_ai/core/constants/app_routes.dart';
 import 'package:nox_ai/core/theme/app_theme.dart';
-
-import 'package:nox_ai/core/utils/page_transitions.dart';
-import 'package:nox_ai/features/home/screens/home_screen.dart';
-import 'package:nox_ai/features/tasks/screens/tasks_screen.dart';
-import 'package:nox_ai/features/calls/screens/call_logs_screen.dart';
-import 'package:nox_ai/features/profile/screens/profile_settings_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -947,11 +943,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 icon: Icons.phone_outlined,
                 label: 'Call Logs',
                 isSelected: _selectedNavIndex == 0,
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const CallLogsScreen()));
-                },
+                onTap: () => context.go(AppRoutes.callLogs),
               ),
               _NavItem(
                 icon: Icons.calendar_today_outlined,
@@ -961,11 +953,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
               // Center mic button
               GestureDetector(
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const HomeScreen()));
-                },
+                onTap: () => context.go(AppRoutes.home),
                 child: Container(
                   width: 64,
                   height: 64,
@@ -985,21 +973,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 icon: Icons.check_circle_outline,
                 label: 'Tasks',
                 isSelected: _selectedNavIndex == 3,
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const TasksScreen()));
-                },
+                onTap: () => context.go(AppRoutes.tasks),
               ),
               _NavItem(
                 icon: Icons.person_outline,
                 label: 'Profile',
                 isSelected: _selectedNavIndex == 4,
-                onTap: () {
-                  Navigator.of(context).pushReplacement(
-                    bottomNavRoute(const ProfileSettingsScreen()),
-                  );
-                },
+                onTap: () => context.go(AppRoutes.profileSettings),
               ),
             ],
           ),

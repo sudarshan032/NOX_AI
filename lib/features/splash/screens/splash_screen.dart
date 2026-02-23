@@ -1,29 +1,34 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:nox_ai/core/constants/app_routes.dart';
 import 'package:nox_ai/core/theme/app_theme.dart';
-import 'package:nox_ai/core/utils/page_transitions.dart';
-import 'package:nox_ai/features/onboarding/screens/onboarding_meet_agent_screen.dart';
+import 'package:nox_ai/providers/app_providers.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen> {
+  bool _navigated = false;
+
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) {
-        Navigator.of(
-          context,
-        ).pushReplacement(fadeSlideRoute(const OnboardingMeetAgentScreen()));
-      }
-    });
+    Future.delayed(const Duration(seconds: 5), _navigate);
+  }
+
+  void _navigate() {
+    if (!mounted || _navigated) return;
+    _navigated = true;
+    final isAuth = ref.read(authStateProvider).isAuthenticated;
+    context.go(isAuth ? AppRoutes.home : AppRoutes.onboardingMeetAgent);
   }
 
   @override

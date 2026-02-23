@@ -1,25 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:nox_ai/core/constants/app_routes.dart';
 import 'package:nox_ai/core/theme/app_theme.dart';
-
 import 'package:nox_ai/core/utils/page_transitions.dart';
-import 'package:nox_ai/features/home/screens/home_screen.dart';
-import 'package:nox_ai/features/calendar/screens/calendar_screen.dart';
-import 'package:nox_ai/features/calls/screens/call_logs_screen.dart';
-import 'package:nox_ai/features/profile/screens/profile_settings_screen.dart';
+import 'package:nox_ai/data/models/task_model.dart';
+import 'package:nox_ai/providers/app_providers.dart';
 
-class TasksScreen extends StatefulWidget {
+class TasksScreen extends ConsumerStatefulWidget {
   const TasksScreen({super.key});
 
   @override
-  State<TasksScreen> createState() => _TasksScreenState();
+  ConsumerState<TasksScreen> createState() => _TasksScreenState();
 }
 
-class _TasksScreenState extends State<TasksScreen> {
+class _TasksScreenState extends ConsumerState<TasksScreen> {
   int _selectedDateFilter = 1; // 0=Yesterday, 1=Today, 2=Tomorrow
-  int _selectedNavIndex = 3; // Tasks tab selected
+  int _selectedNavIndex = 3;
 
   final TextEditingController _messageController = TextEditingController();
+  List<TaskModel> _tasks = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTasks();
+  }
+
+  Future<void> _loadTasks() async {
+    try {
+      final tasks = await ref.read(tasksRepositoryProvider).listTasks();
+      if (mounted) setState(() { _tasks = tasks; _isLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -155,75 +172,68 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   List<Widget> _getTasksForFilter() {
+    if (_isLoading) {
+      return [const Center(child: CircularProgressIndicator())];
+    }
+
+    // Filter tasks by date based on selected tab
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final tomorrow = today.add(const Duration(days: 1));
+
+    List<TaskModel> filtered;
     switch (_selectedDateFilter) {
-      case 0: // Yesterday - completed and overdue tasks
-        return [
-          _TaskCard(
-            title: '--',
-            subtitle: '-- • --',
-            priority: null,
-            showPriority: false,
-            isCompleted: true,
+      case 0: // Yesterday
+        filtered = _tasks.where((t) {
+          final d = DateTime(t.createdAt.year, t.createdAt.month, t.createdAt.day);
+          return d == yesterday;
+        }).toList();
+      case 2: // Tomorrow
+        filtered = _tasks.where((t) {
+          if (t.preferredDate == null) return false;
+          try {
+            final d = DateTime.parse(t.preferredDate!);
+            return DateTime(d.year, d.month, d.day) == tomorrow;
+          } catch (_) { return false; }
+        }).toList();
+      default: // Today (active)
+        filtered = _tasks.where((t) => t.isActive).toList();
+    }
+
+    if (filtered.isEmpty) {
+      return [
+        Center(
+          child: Text(
+            'No tasks',
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
           ),
-          const SizedBox(height: 12),
-          _TaskCard(
-            title: '--',
-            subtitle: '-- • --',
-            priority: 'OVERDUE',
-            showPriority: true,
-            priorityColor: const Color(0xFFE57373),
-          ),
-          const SizedBox(height: 12),
-          _TaskCard(
-            title: '--',
-            subtitle: '-- • --',
-            priority: null,
-            showPriority: false,
-            isCompleted: true,
-          ),
-        ];
-      case 1: // Today - active tasks
-        return [
-          _TaskCard(
-            title: '--',
-            subtitle: '-- • --',
-            priority: 'HIGH',
-            showPriority: true,
-          ),
-          const SizedBox(height: 12),
-          _TaskCard(
-            title: '--',
-            subtitle: '-- • --',
-            priority: null,
-            showPriority: false,
-            showDot: true,
-          ),
-          const SizedBox(height: 12),
-          _TaskCard(
-            title: '--',
-            subtitle: '-- • --',
-            priority: 'MED',
-            showPriority: true,
-          ),
-        ];
-      case 2: // Tomorrow - upcoming tasks
-        return [
-          _TaskCard(
-            title: '--',
-            subtitle: '-- • --',
-            priority: 'HIGH',
-            showPriority: true,
-          ),
-          const SizedBox(height: 12),
-          _TaskCard(
-            title: '--',
-            subtitle: '-- • --',
-            priority: 'LOW',
-            showPriority: true,
-          ),
-        ];
-      default:
-        return [];
+        ),
+      ];
+    }
+
+    final widgets = <Widget>[];
+    for (var i = 0; i < filtered.length; i++) {
+      final task = filtered[i];
+      if (i > 0) widgets.add(const SizedBox(height: 12));
+      widgets.add(_TaskCard(
+        title: task.displayTitle,
+        subtitle: task.description.isNotEmpty ? task.description : '--',
+        priority: _priorityLabel(task.status),
+        showPriority: task.status != 'created',
+        isCompleted: task.isCompleted,
+      ));
+    }
+    return widgets;
+  }
+
+  String? _priorityLabel(String status) {
+    switch (status) {
+      case 'calling': return 'ACTIVE';
+      case 'awaiting_approval': return 'PENDING';
+      case 'completed': return null;
+      case 'failed': return 'FAILED';
+      default: return null;
     }
   }
 
@@ -381,29 +391,17 @@ class _TasksScreenState extends State<TasksScreen> {
                 icon: Icons.phone_outlined,
                 label: 'Call Logs',
                 isSelected: _selectedNavIndex == 0,
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const CallLogsScreen()));
-                },
+                onTap: () => context.go(AppRoutes.callLogs),
               ),
               _NavItem(
                 icon: Icons.calendar_today_outlined,
                 label: 'Calendar',
                 isSelected: _selectedNavIndex == 1,
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const CalendarScreen()));
-                },
+                onTap: () => context.go(AppRoutes.calendar),
               ),
               // Center mic button
               GestureDetector(
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).pushReplacement(bottomNavRoute(const HomeScreen()));
-                },
+                onTap: () => context.go(AppRoutes.home),
                 child: Container(
                   width: 64,
                   height: 64,
@@ -445,11 +443,7 @@ class _TasksScreenState extends State<TasksScreen> {
                 icon: Icons.person_outline,
                 label: 'Profile',
                 isSelected: _selectedNavIndex == 4,
-                onTap: () {
-                  Navigator.of(context).pushReplacement(
-                    bottomNavRoute(const ProfileSettingsScreen()),
-                  );
-                },
+                onTap: () => context.go(AppRoutes.profileSettings),
               ),
             ],
           ),
