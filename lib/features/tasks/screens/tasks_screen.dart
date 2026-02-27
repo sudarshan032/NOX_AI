@@ -197,8 +197,21 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             return DateTime(d.year, d.month, d.day) == tomorrow;
           } catch (_) { return false; }
         }).toList();
-      default: // Today (active)
-        filtered = _tasks.where((t) => t.isActive).toList();
+      default: // Today (active tasks created today or with today's preferred date)
+        filtered = _tasks.where((t) {
+          if (!t.isActive) return false;
+          // Show if created today
+          final created = DateTime(t.createdAt.year, t.createdAt.month, t.createdAt.day);
+          if (created == today) return true;
+          // Show if preferred date is today
+          if (t.preferredDate != null) {
+            try {
+              final d = DateTime.parse(t.preferredDate!);
+              if (DateTime(d.year, d.month, d.day) == today) return true;
+            } catch (_) {}
+          }
+          return false;
+        }).toList();
     }
 
     if (filtered.isEmpty) {

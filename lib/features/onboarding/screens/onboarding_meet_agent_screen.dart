@@ -6,7 +6,7 @@ import 'package:nox_ai/core/theme/app_theme.dart';
 
 import 'package:nox_ai/core/utils/page_transitions.dart';
 import 'package:nox_ai/features/onboarding/screens/onboarding_how_it_works_screen.dart';
-import 'package:nox_ai/features/auth/screens/email_verification_screen.dart';
+import 'package:nox_ai/features/auth/screens/create_account_screen.dart';
 
 class OnboardingMeetAgentScreen extends StatelessWidget {
   const OnboardingMeetAgentScreen({super.key});
@@ -96,7 +96,7 @@ class OnboardingMeetAgentScreen extends StatelessWidget {
                   child: TextButton(
                     onPressed: () {
                       Navigator.of(context).pushReplacement(
-                        fadeSlideRoute(const EmailVerificationScreen()),
+                        fadeSlideRoute(const CreateAccountScreen()),
                       );
                     },
                     child: Text(

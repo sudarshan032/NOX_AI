@@ -115,6 +115,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<void> signInWithGoogle() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      debugPrint('[AUTH] signInWithGoogle: starting...');
+      await _auth.signInWithGoogle();
+      debugPrint('[AUTH] signInWithGoogle: tokens saved, calling getMe...');
+      final user = await _user.getMe();
+      debugPrint('[AUTH] signInWithGoogle: getMe OK, user=${user.id}');
+      state = AuthState(user: user, initialized: true);
+    } catch (e) {
+      debugPrint('[AUTH] signInWithGoogle FAILED: $e');
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
+  }
+
   Future<void> signOut() async {
     await _auth.signOut();
     state = const AuthState(initialized: true);

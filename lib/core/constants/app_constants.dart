@@ -27,7 +27,7 @@ class AppConstants {
   // ─────────────────────────────────────────────────────────────────────────
   static const String baseUrl = String.fromEnvironment(
     'BASE_URL',
-    defaultValue: 'http://192.168.29.71:8010',
+    defaultValue: 'http://56.228.26.195:8010',
   );
   static const String apiVersion = 'api/v1';
   static const Duration apiTimeout = Duration(seconds: 30);
@@ -43,6 +43,12 @@ class AppConstants {
   static const String dailyBriefEndpoint = '/daily-brief';
   static const String preferencesEndpoint = '/preferences';
   static const String googleEndpoint = '/google';
+
+  // Google Sign-In: Web client ID (used as serverClientId for auth code exchange)
+  static const String googleWebClientId = String.fromEnvironment(
+    'GOOGLE_WEB_CLIENT_ID',
+    defaultValue: '1076376370479-iarepk0o00lqqc5ghl1k4kc8arlmc6uk.apps.googleusercontent.com',
+  );
 
   // Storage Keys
   static const String accessTokenKey = 'access_token';

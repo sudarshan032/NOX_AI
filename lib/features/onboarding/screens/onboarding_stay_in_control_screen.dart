@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:nox_ai/core/theme/app_theme.dart';
 
 import 'package:nox_ai/core/utils/page_transitions.dart';
-import 'package:nox_ai/features/auth/screens/email_verification_screen.dart';
+import 'package:nox_ai/features/auth/screens/create_account_screen.dart';
 
 class OnboardingStayInControlScreen extends StatelessWidget {
   const OnboardingStayInControlScreen({super.key});
@@ -545,7 +545,7 @@ class _EnableAgentButton extends StatelessWidget {
           onTap: () {
             Navigator.of(
               context,
-            ).pushReplacement(fadeSlideRoute(const EmailVerificationScreen()));
+            ).pushReplacement(fadeSlideRoute(const CreateAccountScreen()));
           },
           borderRadius: BorderRadius.circular(16),
           child: const Center(

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../core/constants/app_constants.dart';
 import 'secure_storage_service.dart';
 
@@ -72,7 +73,8 @@ class _AuthInterceptor extends Interceptor {
           err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
           final retried = await dio.fetch(err.requestOptions);
           return handler.resolve(retried);
-        } catch (_) {
+        } catch (e) {
+          debugPrint('[AUTH] Token refresh failed: $e — clearing session');
           await SecureStorageService.clearAll();
         }
       }
