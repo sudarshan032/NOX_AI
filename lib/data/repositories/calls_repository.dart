@@ -19,7 +19,16 @@ class CallsRepository {
         'limit': limit,
       },
     );
-    final items = resp.data as List<dynamic>;
+    // Backend returns { items: [...], total: N }
+    final data = resp.data;
+    final List<dynamic> items;
+    if (data is Map<String, dynamic>) {
+      items = data['items'] as List<dynamic>? ?? [];
+    } else if (data is List<dynamic>) {
+      items = data;
+    } else {
+      items = [];
+    }
     return items.map((e) => CallModel.fromJson(e as Map<String, dynamic>)).toList();
   }
 

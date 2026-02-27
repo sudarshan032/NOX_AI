@@ -46,12 +46,18 @@ class TranscriptModel {
   final String callId;
   final String? fullText;
   final String? summary;
+  final Map<String, dynamic>? extractedData;
+  final Map<String, dynamic>? keyInfo;
+  final String? language;
 
   TranscriptModel({
     required this.id,
     required this.callId,
     this.fullText,
     this.summary,
+    this.extractedData,
+    this.keyInfo,
+    this.language,
   });
 
   factory TranscriptModel.fromJson(Map<String, dynamic> json) => TranscriptModel(
@@ -59,5 +65,8 @@ class TranscriptModel {
         callId: json['call_id'] as String,
         fullText: json['full_text'] as String?,
         summary: json['summary'] as String?,
+        extractedData: json['extracted_data'] as Map<String, dynamic>?,
+        keyInfo: json['key_info'] as Map<String, dynamic>?,
+        language: json['language'] as String?,
       );
 }

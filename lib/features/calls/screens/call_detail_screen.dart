@@ -233,6 +233,27 @@ class _CallDetailScreenState extends ConsumerState<CallDetailScreen> {
     );
   }
 
+  String get _callStatus {
+    final s = widget.callData['status'] as String? ?? '';
+    switch (s) {
+      case 'connected':
+      case 'completed':
+        return 'Connected';
+      case 'no_answer':
+        return 'No Answer';
+      case 'failed':
+        return 'Failed';
+      case 'calling':
+        return 'Calling...';
+      default:
+        return s.isNotEmpty ? s[0].toUpperCase() + s.substring(1) : 'Unknown';
+    }
+  }
+
+  String get _callDuration {
+    return widget.callData['duration'] as String? ?? '--';
+  }
+
   Widget _buildCallerInfo() {
     return Column(
       children: [
@@ -252,6 +273,37 @@ class _CallDetailScreenState extends ConsumerState<CallDetailScreen> {
             color: context.textSecondary.withOpacity(0.7),
             fontSize: 13,
           ),
+        ),
+        const SizedBox(height: 16),
+        _buildCallMetrics(),
+      ],
+    );
+  }
+
+  Widget _buildCallMetrics() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _MetricChip(
+          icon: Icons.access_time,
+          label: _callDuration,
+        ),
+        const SizedBox(width: 12),
+        _MetricChip(
+          icon: Icons.circle,
+          label: _callStatus,
+          color: _callStatus == 'Connected'
+              ? const Color(0xFF2E7D32)
+              : _callStatus == 'Failed'
+                  ? const Color(0xFFD4614A)
+                  : null,
+        ),
+        const SizedBox(width: 12),
+        _MetricChip(
+          icon: widget.callData['type'] == 'incoming'
+              ? Icons.call_received
+              : Icons.call_made,
+          label: widget.callData['type'] == 'incoming' ? 'Inbound' : 'Outbound',
         ),
       ],
     );
@@ -330,6 +382,60 @@ class _CallDetailScreenState extends ConsumerState<CallDetailScreen> {
   }
 
   Widget _buildAISummaryContent() {
+    final keyInfo = _transcript?.keyInfo;
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: context.cardBorder, width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.auto_awesome, color: context.gold, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'AI Summary',
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _summary,
+                style: TextStyle(
+                  color: context.textSecondary,
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (keyInfo != null && keyInfo.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildKeyInfoCard(keyInfo),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildKeyInfoCard(Map<String, dynamic> keyInfo) {
+    final entries = keyInfo.entries
+        .where((e) => e.value != null && e.value.toString().isNotEmpty)
+        .toList();
+    if (entries.isEmpty) return const SizedBox.shrink();
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -343,10 +449,10 @@ class _CallDetailScreenState extends ConsumerState<CallDetailScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.auto_awesome, color: context.gold, size: 18),
+              Icon(Icons.info_outline, color: context.gold, size: 18),
               const SizedBox(width: 8),
               Text(
-                'AI Summary',
+                'Key Information',
                 style: TextStyle(
                   color: context.textPrimary,
                   fontSize: 15,
@@ -356,14 +462,46 @@ class _CallDetailScreenState extends ConsumerState<CallDetailScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            _summary,
-            style: TextStyle(
-              color: context.textSecondary,
-              fontSize: 14,
-              height: 1.5,
-            ),
-          ),
+          ...entries.map((e) {
+            final label = e.key
+                .replaceAll('_', ' ')
+                .split(' ')
+                .map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '')
+                .join(' ');
+            final value = e.value is List
+                ? (e.value as List).join(', ')
+                : e.value.toString();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 120,
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: context.gold.withOpacity(0.8),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      value,
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -390,6 +528,45 @@ class _CallDetailScreenState extends ConsumerState<CallDetailScreen> {
           isAgent: isAgent,
         );
       }).toList(),
+    );
+  }
+}
+
+class _MetricChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color? color;
+
+  const _MetricChip({
+    required this.icon,
+    required this.label,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: context.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.cardBorder, width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color ?? context.textSecondary),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color ?? context.textSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
